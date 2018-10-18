@@ -225,6 +225,14 @@ update.notify()
 
 cli = capitano.parse(process.argv)
 runCommand = ->
+	if require('fs').realpathSync(process.argv[1]).match(/(^|\/)resin$/)
+		console.log(
+			'''
+			*****
+			Please note: the "resin" command-line tool has been replaced with "balena".
+			Only balena will be actively maintained. Get it at: https://balena.io
+			*****
+			''')
 	if cli.global?.help
 		capitanoExecuteAsync(command: "help #{cli.command ? ''}")
 	else
