@@ -1,16 +1,16 @@
 import { stripIndent } from 'common-tags';
-import { ResinSDK, Application } from 'resin-sdk';
+import { BalenaSDK, Application } from 'balena-sdk';
 
 import Logger = require('./logger');
 
 import { runCommand } from './helpers';
 import { exec, execBuffered } from './ssh';
 
-const MIN_RESINOS_VERSION = 'v2.14.0';
+const MIN_BALENAOS_VERSION = 'v2.14.0';
 
 export async function join(
 	logger: Logger,
-	sdk: ResinSDK,
+	sdk: BalenaSDK,
 	deviceHostnameOrIp?: string,
 	appName?: string,
 ): Promise<void> {
@@ -47,13 +47,13 @@ export async function join(
 	await configure(deviceIp, config);
 	logger.logDebug('All done.');
 
-	const platformUrl = await sdk.settings.get('resinUrl');
+	const platformUrl = await sdk.settings.get('balenaUrl');
 	logger.logSuccess(`Device successfully joined ${platformUrl}!`);
 }
 
 export async function leave(
 	logger: Logger,
-	_sdk: ResinSDK,
+	_sdk: BalenaSDK,
 	deviceHostnameOrIp?: string,
 ): Promise<void> {
 	logger.logDebug('Determining device...');
@@ -110,7 +110,7 @@ async function assertDeviceIsCompatible(deviceIp: string): Promise<void> {
 	} catch (err) {
 		exitWithExpectedError(stripIndent`
 			Device "${deviceIp}" is incompatible and cannot join or leave an application.
-			Please select or provision device with resinOS newer than ${MIN_RESINOS_VERSION}.`);
+			Please select or provision device with balenaOS newer than ${MIN_BALENAOS_VERSION}.`);
 	}
 }
 
@@ -159,7 +159,7 @@ async function getOrSelectLocalDevice(deviceIp?: string): Promise<string> {
 }
 
 async function getOrSelectApplication(
-	sdk: ResinSDK,
+	sdk: BalenaSDK,
 	deviceType: string,
 	appName?: string,
 ): Promise<Application> {
@@ -260,7 +260,7 @@ async function getOrSelectApplication(
 }
 
 async function createApplication(
-	sdk: ResinSDK,
+	sdk: BalenaSDK,
 	deviceType: string,
 	name?: string,
 ): Promise<Application> {
@@ -304,7 +304,7 @@ async function createApplication(
 	});
 }
 
-async function generateApplicationConfig(sdk: ResinSDK, app: Application) {
+async function generateApplicationConfig(sdk: BalenaSDK, app: Application) {
 	const form = await import('resin-cli-form');
 	const { generateApplicationConfig: configGen } = await import('./config');
 
