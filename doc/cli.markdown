@@ -980,6 +980,10 @@ ssh gateway port
 
 increase verbosity
 
+#### --proxy, -x
+
+force use of balena-proxy to establish connection
+
 #### --host, -s
 
 access host OS (for devices with balenaOS >= 2.7.5)

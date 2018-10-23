@@ -1,5 +1,5 @@
 ###
-Copyright 2016-2017 Balena
+Copyright 2016 Balena
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,6 +48,11 @@ module.exports =
 			boolean: true
 			description: 'increase verbosity'
 			alias: 'v'
+	,
+			signature: 'proxy'
+			boolean: true
+			description: 'force use of balena-proxy to establish connection'
+			alias: 'x'
 	commandOptions.hostOSAccess,
 			signature: 'noproxy'
 			boolean: true
@@ -62,6 +67,7 @@ module.exports =
 		_ = require('lodash')
 		bash = require('bash')
 		hasbin = require('hasbin')
+		semver = require('resin-semver')
 		{ getSubShellCommand } = require('../utils/helpers')
 		patterns = require('../utils/patterns')
 
@@ -105,10 +111,20 @@ module.exports =
 			return params.uuid if uuidExists
 			return patterns.inferOrSelectDevice()
 		.then (uuid) ->
-			console.info("Connecting to: #{uuid}")
 			balena.models.device.get(uuid)
 		.then (device) ->
+			useProxySvc = options.proxy or semver.lt(device.os_version, '2.20.0')
+			logMsg = "Connecting to: #{device.uuid}"
+			logMsg = "#{logMsg} (via proxy)" if useProxySvc
+			console.info(logMsg)
 			patterns.exitWithExpectedError('Device is not online') if not device.is_online
+
+			# update params.uuid so ssh_direct does not prompt for device selection again
+			params.uuid = device.uuid
+			# if device is running os >= 2.20.0 then we can ssh directly
+			if not useProxySvc
+				sshDirect = require('./ssh_direct')
+				return sshDirect.ssh.action(params, options)
 
 			Promise.props
 				username: balena.auth.whoami()

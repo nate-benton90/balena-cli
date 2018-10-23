@@ -238,7 +238,7 @@ export function awaitDevice(uuid: string) {
 	});
 }
 
-export function inferOrSelectDevice(preferredUuid: string) {
+export function inferOrSelectDevice(preferredUuid?: string) {
 	const balena = getBalenaSdk();
 	return balena.models.device
 		.getAll()
