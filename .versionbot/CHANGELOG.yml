@@ -1,4 +1,40 @@
 - commits:
+    - subject: >-
+        Fix 'balena push' hanging on Windows (CTRL-C was required after the
+        unicorn)
+      hash: db1c3ffc7310b8fd73f5b98255d98172eb99ea74
+      body: ''
+      footer:
+        Resolves: '#1554'
+        resolves: '#1554'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Paulo Castro <paulo@balena.io>
+        signed-off-by: Paulo Castro <paulo@balena.io>
+      author: Paulo Castro
+    - subject: >-
+        Add hint about the 'jq' utility in the documentation of the --json
+        option
+      hash: 54fd76e1d2b50526bee86025551c9e99300a0b88
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Paulo Castro <paulo@balena.io>
+        signed-off-by: Paulo Castro <paulo@balena.io>
+      author: Paulo Castro
+    - subject: Add '.nyc_output' folder to '.gitignore' (test coverage reporting)
+      hash: b013d2a82ca423625f9e21124e115245becd0e22
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Paulo Castro <paulo@balena.io>
+        signed-off-by: Paulo Castro <paulo@balena.io>
+      author: Paulo Castro
+  version: 11.21.1
+  date: 2020-01-06T12:15:25.979Z
+- commits:
     - subject: Add --verbose and --json options to the 'devices supported' command
       hash: 323c9191b6541285cbb44855b43acf01c5866d30
       body: |
