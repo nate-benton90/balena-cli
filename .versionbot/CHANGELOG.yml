@@ -1,4 +1,20 @@
 - commits:
+    - subject: >-
+        Prevent file ignorer from ignoring Dockerfile (and variants),
+        docker-compose.yml
+      hash: ea76f9a1094bc598d351042c33957785fa84f85e
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Resolves: '#1445'
+        resolves: '#1445'
+        Signed-off-by: Scott Lowe <scott@balena.io>
+        signed-off-by: Scott Lowe <scott@balena.io>
+      author: Scott Lowe
+  version: 11.21.1
+  date: 2020-01-08T19:24:43.207Z
+- commits:
     - subject: Add --verbose and --json options to the 'devices supported' command
       hash: 323c9191b6541285cbb44855b43acf01c5866d30
       body: |
