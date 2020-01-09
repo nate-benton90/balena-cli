@@ -1,4 +1,27 @@
 - commits:
+    - subject: Fix 'balena join' when the user is not logged in
+      hash: 43f7f856e9ce8753ab382614644cb1d775731d0c
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Paulo Castro <paulo@balena.io>
+        signed-off-by: Paulo Castro <paulo@balena.io>
+      author: Paulo Castro
+    - subject: >-
+        Fix join and leave commands on Windows (hanging on stdin and argument
+        escaping)
+      hash: 452036b7ea2608ea14db9e6eb4762efb4d1292ea
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Paulo Castro <paulo@balena.io>
+        signed-off-by: Paulo Castro <paulo@balena.io>
+      author: Paulo Castro
+  version: 11.21.1
+  date: 2020-01-09T14:29:53.062Z
+- commits:
     - subject: Add --verbose and --json options to the 'devices supported' command
       hash: 323c9191b6541285cbb44855b43acf01c5866d30
       body: |
