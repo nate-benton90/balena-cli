@@ -1,4 +1,18 @@
 - commits:
+    - subject: >-
+        Update CONTRIBUTING.md regarding npm installation and some common
+        gotchas
+      hash: 1129d63d313b70b9d34966dd52c45fb54bc9376b
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Paulo Castro <paulo@balena.io>
+        signed-off-by: Paulo Castro <paulo@balena.io>
+      author: Paulo Castro
+  version: 11.21.1
+  date: 2020-01-10T14:06:53.020Z
+- commits:
     - subject: Add --verbose and --json options to the 'devices supported' command
       hash: 323c9191b6541285cbb44855b43acf01c5866d30
       body: |
