@@ -1,4 +1,22 @@
 - commits:
+    - subject: Add Windows-specific hint to 'balena scan' output
+      hash: 9389dd29d268a532452fdeeeb0efd010d611465c
+      body: >
+        An extra Windows-specific message is now appended to the 'Could not find
+        any balenaOS devices' message - if the OS is Windows.
+
+
+        Also updated the INSTALL instructions with details of the dependency on
+        Bonjour.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Graham McCulloch <graham@balena.io>
+        signed-off-by: Graham McCulloch <graham@balena.io>
+      author: Graham McCulloch
+  version: 11.21.1
+  date: 2020-01-10T01:21:40.681Z
+- commits:
     - subject: Add --verbose and --json options to the 'devices supported' command
       hash: 323c9191b6541285cbb44855b43acf01c5866d30
       body: |
