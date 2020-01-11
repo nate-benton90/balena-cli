@@ -15,13 +15,8 @@ Opts must be an object with the following keys:
 	buildOpts: arguments to forward to docker build command
 ###
 buildProject = (docker, logger, composeOpts, opts) ->
-	compose.loadProject(
-		logger
-		composeOpts.projectPath
-		composeOpts.projectName
-		undefined  # image: name of pre-built image
-		composeOpts.dockerfilePath  # ok if undefined
-	)
+	{ loadProject } = require('../utils/compose_ts')
+	Promise.resolve(loadProject(logger, composeOpts))
 	.then (project) ->
 		appType = opts.app?.application_type?[0]
 		if appType? and project.descriptors.length > 1 and not appType.supports_multicontainer

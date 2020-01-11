@@ -32,7 +32,12 @@ interface Descriptor {
 	serviceName: string;
 }
 
-export function resolveProject(projectRoot: string): Bluebird<string>;
+export interface ComposeOpts {
+	dockerfilePath?: string;
+	noComposeCheck: boolean;
+	projectName: string;
+	projectPath: string;
+}
 
 export interface ComposeProject {
 	path: string;
@@ -41,13 +46,13 @@ export interface ComposeProject {
 	descriptors: Descriptor[];
 }
 
-export function loadProject(
-	logger: Logger,
-	projectPath: string,
-	projectName: string,
-	image?: string,
-	dockerfilePath?: string,
-): Bluebird<ComposeProject>;
+export function createProject(
+	composePath: string,
+	composeStr: string,
+	projectName: string | null = null,
+): ComposeProject;
+
+export function resolveProject(projectRoot: string): Bluebird<string>;
 
 export function tarDirectory(
 	source: string,

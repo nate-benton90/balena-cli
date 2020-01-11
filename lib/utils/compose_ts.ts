@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2018 Balena Ltd.
+ * Copyright 2018-2020 Balena Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { BalenaSDK } from 'balena-sdk';
 import * as Bluebird from 'bluebird';
 import { stripIndent } from 'common-tags';
 import Dockerode = require('dockerode');
@@ -23,7 +24,7 @@ import * as MultiBuild from 'resin-multibuild';
 import { Readable } from 'stream';
 import * as tar from 'tar-stream';
 
-import { BalenaSDK } from 'balena-sdk';
+import { ExpectedError } from '../errors';
 import { DeviceInfo } from './device/api';
 import Logger = require('./logger');
 import { exitWithExpectedError } from './patterns';
@@ -33,6 +34,50 @@ export interface RegistrySecrets {
 		username: string;
 		password: string;
 	};
+}
+
+/**
+ * high-level function resolving a project and creating a composition out
+ * of it in one go. if image is given, it'll create a default project for
+ * that without looking for a project. falls back to creating a default
+ * project if none is found at the given projectPath.
+ */
+export async function loadProject(
+	logger: Logger,
+	opts: import('./compose').ComposeOpts,
+	image?: string,
+): Promise<import('./compose').ComposeProject> {
+	const dockerfilePath = await validateProjectDirectory(opts);
+	const compose = await import('resin-compose-parse');
+	const { createProject, resolveProject } = await import('./compose');
+	let composeStr: string;
+
+	logger.logDebug('Loading project...');
+
+	if (image) {
+		logger.logInfo(`Creating default composition with image: ${image}`);
+		composeStr = compose.defaultComposition(image);
+	} else {
+		logger.logDebug('Resolving project...');
+		try {
+			composeStr = await resolveProject(opts.projectPath);
+			if (dockerfilePath) {
+				logger.logWarn(
+					`Ignoring alternative dockerfile "${dockerfilePath}" because a docker-compose file exists`,
+				);
+			} else {
+				logger.logInfo('Compose file detected');
+			}
+		} catch (e) {
+			logger.logDebug(`Failed to resolve project: ${e}`);
+			logger.logInfo(
+				`Creating default composition with source: ${opts.projectPath}`,
+			);
+			composeStr = compose.defaultComposition(undefined, dockerfilePath);
+		}
+	}
+	logger.logDebug('Creating project...');
+	return createProject(opts.projectPath, composeStr, opts.projectName);
 }
 
 /**
@@ -268,63 +313,131 @@ async function performResolution(
  * Enforce that, for example, if 'myProject/MyDockerfile.template' is specified
  * as an alternativate Dockerfile name, then 'myProject/MyDockerfile' must not
  * exist.
+ * Return the tar stream path (Posix, normalized) for the given dockerfilePath.
+ * For example, on Windows, given a dockerfilePath of 'foo\..\bar\Dockerfile',
+ * return 'bar/Dockerfile'. On Linux, given './bar/Dockerfile', return 'bar/Dockerfile'.
+ *
  * @param projectPath The project source folder (-s command-line option)
  * @param dockerfilePath The alternative Dockerfile specified by the user
+ * @return A normalized posix representation of dockerfilePath
  */
-export function validateSpecifiedDockerfile(
+async function validateSpecifiedDockerfile(
 	projectPath: string,
-	dockerfilePath: string = '',
-): string {
-	if (!dockerfilePath) {
-		return dockerfilePath;
-	}
-	const { isAbsolute, join, normalize, parse, posix } = require('path');
-	const { existsSync } = require('fs');
+	dockerfilePath: string,
+): Promise<string> {
+	const fs = (await import('mz')).fs;
+	const { isAbsolute, join, normalize, parse } = await import('path');
 	const { contains, toNativePath, toPosixPath } = MultiBuild.PathUtils;
+
+	const nativeProjectPath = normalize(projectPath);
+	const nativeDockerfilePath = normalize(toNativePath(dockerfilePath));
 
 	// reminder: native windows paths may start with a drive specificaton,
 	// e.g. 'C:\absolute' or 'C:relative'.
-	if (isAbsolute(dockerfilePath) || posix.isAbsolute(dockerfilePath)) {
-		exitWithExpectedError(stripIndent`
-			Error: absolute Dockerfile path detected:
-			"${dockerfilePath}"
-			The Dockerfile path should be relative to the source folder.
-		`);
-	}
-	const nativeProjectPath = normalize(projectPath);
-	const nativeDockerfilePath = join(projectPath, toNativePath(dockerfilePath));
-
-	if (!contains(nativeProjectPath, nativeDockerfilePath)) {
-		// Note that testing the existence of nativeDockerfilePath in the
-		// filesystem (after joining its path to the source folder) is not
-		// sufficient, because the user could have added '../' to the path.
-		exitWithExpectedError(stripIndent`
-			Error: the specified Dockerfile must be in a subfolder of the source folder:
+	if (isAbsolute(nativeDockerfilePath)) {
+		throw new ExpectedError(stripIndent`
+			Error: the specified Dockerfile cannot be an absolute path. The path must be
+			relative to, and not a parent folder of, the project's source folder.
 			Specified dockerfile: "${nativeDockerfilePath}"
-			Source folder: "${nativeProjectPath}"
+			Project's source folder: "${nativeProjectPath}"
 		`);
 	}
 
-	if (!existsSync(nativeDockerfilePath)) {
-		exitWithExpectedError(stripIndent`
-			Error: Dockerfile not found: "${nativeDockerfilePath}"
+	// note that path.normalize('a/../../b') results in '../b'
+	if (nativeDockerfilePath.startsWith('..')) {
+		throw new ExpectedError(stripIndent`
+			Error: the specified Dockerfile cannot be in a parent folder of the project's
+			source folder. Note that the path should be relative to the project's source
+			folder, not the current folder.
+			Specified dockerfile: "${nativeDockerfilePath}"
+			Project's source folder: "${nativeProjectPath}"
 		`);
 	}
 
-	const { dir, ext, name } = parse(nativeDockerfilePath);
+	console.error(`join(${nativeProjectPath}, ${nativeDockerfilePath})`);
+	const fullDockerfilePath = join(nativeProjectPath, nativeDockerfilePath);
+
+	if (!(await fs.exists(fullDockerfilePath))) {
+		throw new ExpectedError(stripIndent`
+			Error: file not found: "${fullDockerfilePath}"
+		`);
+	}
+
+	if (!contains(nativeProjectPath, fullDockerfilePath)) {
+		throw new ExpectedError(stripIndent`
+			Error: the specified Dockerfile must be in a subfolder of the source folder:
+			Specified dockerfile: "${fullDockerfilePath}"
+			Project's source folder: "${nativeProjectPath}"
+		`);
+	}
+
+	const { dir, ext, name } = parse(fullDockerfilePath);
 	if (ext) {
 		const nativePathMinusExt = join(dir, name);
-
-		if (existsSync(nativePathMinusExt)) {
-			exitWithExpectedError(stripIndent`
-				Error: "${name}" exists on the same folder as "${dockerfilePath}".
-				When an alternative Dockerfile name is specified, a file with the same
-				base name (minus the file extension) must not exist in the same folder.
-				This is because the base name file will be auto generated and added to
-				the tar stream that is sent to the docker daemon, resulting in duplicate
-				Dockerfiles and undefined behavior.
+		if (await fs.exists(nativePathMinusExt)) {
+			throw new ExpectedError(stripIndent`
+				Error: "${name}" exists on the same folder as "${nativeDockerfilePath}".
+				When an alternative Dockerfile name is specified, a file with the same base name
+				(minus the file extension) must not exist in the same folder. This is because
+				the base name file will be auto generated and added to the tar stream that is
+				sent to balenaEngine or the Docker daemon, resulting in duplicate Dockerfiles
+				and undefined behavior.
 			`);
 		}
 	}
-	return posix.normalize(toPosixPath(dockerfilePath));
+	return toPosixPath(nativeDockerfilePath);
+}
+
+export async function validateProjectDirectory(
+	opts: import('./compose').ComposeOpts,
+): Promise<string> {
+	console.error('validateProjectDirectory');
+
+	if (opts.dockerfilePath) {
+		const dockerfilePath = await validateSpecifiedDockerfile(
+			opts.projectPath,
+			opts.dockerfilePath,
+		);
+		console.error(`dockerfilePath: "${dockerfilePath}"`);
+		throw new ExpectedError('foo');
+		return dockerfilePath;
+	}
+
+	const { join } = await import('path');
+	const fs = (await import('mz')).fs;
+	const files = await fs.readdir(opts.projectPath);
+	console.log(`files: ${files}`);
+	const projectMatch = (file: string) =>
+		/^(Dockerfile|Dockerfile\.\S+|docker-compose.ya?ml|package.json)$/.test(
+			file,
+		);
+	if (!_.some(files, projectMatch)) {
+		throw new ExpectedError(stripIndent`
+			Error: no "Dockerfile[.*]", "docker-compose.yml" or "package.json" file
+			found in project source folder "${opts.projectPath}"
+		`);
+	}
+	if (!opts.noComposeCheck) {
+		const checkCompose = async (folder: string) => {
+			return _.some(
+				await Promise.all([
+					fs.exists(join(folder, 'docker-compose.yml')),
+					fs.exists(join(folder, 'docker-compose.yaml')),
+				]),
+			);
+		};
+		const [hasCompose, hasParentCompose] = await Promise.all([
+			checkCompose(opts.projectPath),
+			checkCompose(join(opts.projectPath, '..')),
+		]);
+		if (!hasCompose && hasParentCompose) {
+			Logger.getLogger().logWarn(stripIndent`
+				"docker-compose.y[a]ml" file found in parent directory: please check that the
+				correct folder is being built / pushed. (Suppress with '--nocompose-check'.)
+			`);
+		}
+	}
+
+	throw new ExpectedError('bar');
+	return opts.dockerfilePath || '';
 }

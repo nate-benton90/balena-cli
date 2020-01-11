@@ -29,7 +29,11 @@ import * as semver from 'resin-semver';
 import { Readable } from 'stream';
 
 import { BALENA_ENGINE_TMP_PATH } from '../../config';
-import { checkBuildSecretsRequirements, makeBuildTasks } from '../compose_ts';
+import {
+	checkBuildSecretsRequirements,
+	loadProject,
+	makeBuildTasks,
+} from '../compose_ts';
 import { workaroundWindowsDnsIssue } from '../helpers';
 import Logger = require('../logger');
 import { DeviceAPI, DeviceInfo } from './api';
@@ -49,6 +53,7 @@ export interface DeviceDeployOptions {
 	dockerfilePath?: string;
 	registrySecrets: RegistrySecrets;
 	nocache: boolean;
+	noComposeCheck: boolean;
 	nolive: boolean;
 	detached: boolean;
 	services?: string[];
@@ -118,7 +123,7 @@ async function environmentFromInput(
 }
 
 export async function deployToDevice(opts: DeviceDeployOptions): Promise<void> {
-	const { loadProject, tarDirectory } = await import('../compose');
+	const { tarDirectory } = await import('../compose');
 	const { exitWithExpectedError } = await import('../patterns');
 
 	const { displayDeviceLogs } = await import('./logs');
@@ -174,13 +179,12 @@ export async function deployToDevice(opts: DeviceDeployOptions): Promise<void> {
 
 	globalLogger.logInfo(`Starting build on device ${opts.deviceHost}`);
 
-	const project = await loadProject(
-		globalLogger,
-		opts.source, // project path
-		'local', // project name
-		undefined, // name of a pre-built image
-		opts.dockerfilePath, // alternative Dockerfile; OK to be undefined
-	);
+	const project = await loadProject(globalLogger, {
+		dockerfilePath: opts.dockerfilePath,
+		noComposeCheck: opts.noComposeCheck,
+		projectName: 'local',
+		projectPath: opts.source,
+	});
 
 	// Attempt to attach to the device's docker daemon
 	const docker = connectToDocker(

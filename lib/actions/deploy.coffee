@@ -20,14 +20,9 @@ deployProject = (docker, logger, composeOpts, opts) ->
 	_ = require('lodash')
 	doodles = require('resin-doodles')
 	sdk = require('balena-sdk').fromSharedOptions()
+	{ loadProject } = require('../utils/compose_ts')
 
-	compose.loadProject(
-		logger
-		composeOpts.projectPath
-		composeOpts.projectName
-		opts.image
-		composeOpts.dockerfilePath  # ok if undefined
-	)
+	Promise.resolve(loadProject(logger, composeOpts, opts.image))
 	.then (project) ->
 		if project.descriptors.length > 1 and !opts.app.application_type?[0]?.supports_multicontainer
 			throw new Error('Target application does not support multiple containers. Aborting!')

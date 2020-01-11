@@ -109,6 +109,7 @@ export const push: CommandDefinition<
 		emulated?: boolean;
 		dockerfile?: string; // DeviceDeployOptions.dockerfilePath (alternative Dockerfile)
 		nocache?: boolean;
+		'nocompose-check'?: boolean;
 		'registry-secrets'?: string;
 		nolive?: boolean;
 		detached?: boolean;
@@ -190,6 +191,12 @@ export const push: CommandDefinition<
 			boolean: true,
 		},
 		{
+			signature: 'nocompose-check',
+			description:
+				"Disable check for 'docker-compose.yml' file in parent source folder",
+			boolean: true,
+		},
+		{
 			signature: 'registry-secrets',
 			alias: 'R',
 			parameter: 'secrets.yml|.json',
@@ -254,7 +261,7 @@ export const push: CommandDefinition<
 		const remote = await import('../utils/remote-build');
 		const deviceDeploy = await import('../utils/device/deploy');
 		const { checkLoggedIn } = await import('../utils/patterns');
-		const { validateSpecifiedDockerfile, getRegistrySecrets } = await import(
+		const { validateProjectDirectory, getRegistrySecrets } = await import(
 			'../utils/compose_ts'
 		);
 		const { BuildError } = await import('../utils/device/errors');
@@ -270,10 +277,12 @@ export const push: CommandDefinition<
 			console.error(`[debug] Using ${source} as build source`);
 		}
 
-		const dockerfilePath = validateSpecifiedDockerfile(
-			source,
-			options.dockerfile,
-		);
+		const dockerfilePath = await validateProjectDirectory({
+			dockerfilePath: options.dockerfile,
+			noComposeCheck: options['nocompose-check'] || false,
+			projectName: 'local',
+			projectPath: source,
+		});
 
 		const registrySecrets = await getRegistrySecrets(
 			sdk,
@@ -349,6 +358,7 @@ export const push: CommandDefinition<
 						dockerfilePath,
 						registrySecrets,
 						nocache: options.nocache || false,
+						noComposeCheck: options['nocompose-check'] || false,
 						nolive: options.nolive || false,
 						detached: options.detached || false,
 						services: servicesToDisplay,

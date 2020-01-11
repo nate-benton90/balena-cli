@@ -1700,6 +1700,10 @@ Alternative Dockerfile name/path, relative to the source folder
 
 Don't use cache when building this project
 
+#### --nocompose-check
+
+Disable check for 'docker-compose.yml' file in parent source folder
+
 #### --registry-secrets, -R &#60;secrets.yml|.json&#62;
 
 Path to a local YAML or JSON file containing Docker registry passwords used to pull base images.
@@ -1850,17 +1854,21 @@ The target balena application this build is for
 
 Specify an alternate project name; default is the directory name
 
-#### --emulated, -e
-
-Run an emulated build using Qemu
-
 #### --dockerfile &#60;Dockerfile&#62;
 
 Alternative Dockerfile name/path, relative to the source folder
 
+#### --emulated, -e
+
+Run an emulated build using Qemu
+
 #### --logs
 
 Display full log output
+
+#### --nocompose-check
+
+Disable check for 'docker-compose.yml' file in parent source folder
 
 #### --registry-secrets, -R &#60;secrets.yml|.json&#62;
 
@@ -1975,17 +1983,21 @@ Don't upload build logs to the dashboard with image (if building)
 
 Specify an alternate project name; default is the directory name
 
-#### --emulated, -e
-
-Run an emulated build using Qemu
-
 #### --dockerfile &#60;Dockerfile&#62;
 
 Alternative Dockerfile name/path, relative to the source folder
 
+#### --emulated, -e
+
+Run an emulated build using Qemu
+
 #### --logs
 
 Display full log output
+
+#### --nocompose-check
+
+Disable check for 'docker-compose.yml' file in parent source folder
 
 #### --registry-secrets, -R &#60;secrets.yml|.json&#62;
 
