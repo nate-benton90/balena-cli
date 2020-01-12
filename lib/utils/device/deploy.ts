@@ -65,11 +65,6 @@ interface ParsedEnvironment {
 	[serviceName: string]: { [key: string]: string };
 }
 
-async function checkSource(source: string): Promise<boolean> {
-	const { fs } = await import('mz');
-	return (await fs.exists(source)) && (await fs.stat(source)).isDirectory();
-}
-
 async function environmentFromInput(
 	envs: string[],
 	serviceNames: string[],
@@ -125,12 +120,7 @@ async function environmentFromInput(
 export async function deployToDevice(opts: DeviceDeployOptions): Promise<void> {
 	const { tarDirectory } = await import('../compose');
 	const { exitWithExpectedError } = await import('../patterns');
-
 	const { displayDeviceLogs } = await import('./logs');
-
-	if (!(await checkSource(opts.source))) {
-		exitWithExpectedError(`Could not access source directory: ${opts.source}`);
-	}
 
 	const api = new DeviceAPI(globalLogger, opts.deviceHost);
 

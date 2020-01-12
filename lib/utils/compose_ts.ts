@@ -19,6 +19,8 @@ import * as Bluebird from 'bluebird';
 import { stripIndent } from 'common-tags';
 import Dockerode = require('dockerode');
 import * as _ from 'lodash';
+import { fs } from 'mz';
+import * as path from 'path';
 import { Composition } from 'resin-compose-parse';
 import * as MultiBuild from 'resin-multibuild';
 import { Readable } from 'stream';
@@ -45,25 +47,25 @@ export interface RegistrySecrets {
 export async function loadProject(
 	logger: Logger,
 	opts: import('./compose').ComposeOpts,
-	image?: string,
 ): Promise<import('./compose').ComposeProject> {
-	const dockerfilePath = await validateProjectDirectory(opts);
 	const compose = await import('resin-compose-parse');
-	const { createProject, resolveProject } = await import('./compose');
+	const { createProject } = await import('./compose');
 	let composeStr: string;
 
 	logger.logDebug('Loading project...');
 
-	if (image) {
-		logger.logInfo(`Creating default composition with image: ${image}`);
-		composeStr = compose.defaultComposition(image);
+	if (opts.image) {
+		logger.logInfo(`Creating default composition with image: ${opts.image}`);
+		composeStr = compose.defaultComposition(opts.image);
 	} else {
 		logger.logDebug('Resolving project...');
 		try {
 			composeStr = await resolveProject(opts.projectPath);
-			if (dockerfilePath) {
+			if (opts.dockerfilePath) {
 				logger.logWarn(
-					`Ignoring alternative dockerfile "${dockerfilePath}" because a docker-compose file exists`,
+					`Ignoring alternative dockerfile "${
+						opts.dockerfilePath
+					}" because a docker-compose file exists`,
 				);
 			} else {
 				logger.logInfo('Compose file detected');
@@ -73,11 +75,25 @@ export async function loadProject(
 			logger.logInfo(
 				`Creating default composition with source: ${opts.projectPath}`,
 			);
-			composeStr = compose.defaultComposition(undefined, dockerfilePath);
+			composeStr = compose.defaultComposition(undefined, opts.dockerfilePath);
 		}
 	}
 	logger.logDebug('Creating project...');
 	return createProject(opts.projectPath, composeStr, opts.projectName);
+}
+
+const compositionFileNames = ['docker-compose.yml', 'docker-compose.yaml'];
+
+/**
+ * Look into the given directory for valid compose files and return
+ * the contents of the first one found.
+ */
+async function resolveProject(projectRoot: string): Promise<string> {
+	return Bluebird.any(
+		compositionFileNames.map(filename =>
+			fs.readFile(path.join(projectRoot, filename), 'utf-8'),
+		),
+	);
 }
 
 /**
@@ -89,8 +105,6 @@ export async function loadProject(
 export async function loadBuildMetatada(
 	sourceDir: string,
 ): Promise<[MultiBuild.ParsedBalenaYml, string]> {
-	const { fs } = await import('mz');
-	const path = await import('path');
 	let metadataPath = '';
 	let rawString = '';
 
@@ -160,23 +174,20 @@ export async function getRegistrySecrets(
 	sdk: BalenaSDK,
 	inputFilename?: string,
 ): Promise<RegistrySecrets> {
-	const { fs } = await import('mz');
-	const Path = await import('path');
-
 	if (inputFilename != null) {
 		return await parseRegistrySecrets(inputFilename);
 	}
 
 	const directory = await sdk.settings.get('dataDirectory');
 	const potentialPaths = [
-		Path.join(directory, 'secrets.yml'),
-		Path.join(directory, 'secrets.yaml'),
-		Path.join(directory, 'secrets.json'),
+		path.join(directory, 'secrets.yml'),
+		path.join(directory, 'secrets.yaml'),
+		path.join(directory, 'secrets.json'),
 	];
 
-	for (const path of potentialPaths) {
-		if (await fs.exists(path)) {
-			return await parseRegistrySecrets(path);
+	for (const potentialPath of potentialPaths) {
+		if (await fs.exists(potentialPath)) {
+			return await parseRegistrySecrets(potentialPath);
 		}
 	}
 
@@ -186,7 +197,6 @@ export async function getRegistrySecrets(
 async function parseRegistrySecrets(
 	secretsFilename: string,
 ): Promise<RegistrySecrets> {
-	const { fs } = await import('mz');
 	try {
 		let isYaml = false;
 		if (/.+\.ya?ml$/i.test(secretsFilename)) {
@@ -207,21 +217,6 @@ async function parseRegistrySecrets(
 			}`,
 		);
 	}
-}
-
-/**
- * Validate the compose-specific command-line options defined in compose.coffee.
- * This function is meant to be called very early on to validate users' input,
- * before any project loading / building / deploying.
- */
-export async function validateComposeOptions(
-	sdk: BalenaSDK,
-	options: { [opt: string]: any },
-) {
-	options['registry-secrets'] = await getRegistrySecrets(
-		sdk,
-		options['registry-secrets'],
-	);
 }
 
 /**
@@ -325,16 +320,14 @@ async function validateSpecifiedDockerfile(
 	projectPath: string,
 	dockerfilePath: string,
 ): Promise<string> {
-	const fs = (await import('mz')).fs;
-	const { isAbsolute, join, normalize, parse } = await import('path');
 	const { contains, toNativePath, toPosixPath } = MultiBuild.PathUtils;
 
-	const nativeProjectPath = normalize(projectPath);
-	const nativeDockerfilePath = normalize(toNativePath(dockerfilePath));
+	const nativeProjectPath = path.normalize(projectPath);
+	const nativeDockerfilePath = path.normalize(toNativePath(dockerfilePath));
 
 	// reminder: native windows paths may start with a drive specificaton,
 	// e.g. 'C:\absolute' or 'C:relative'.
-	if (isAbsolute(nativeDockerfilePath)) {
+	if (path.isAbsolute(nativeDockerfilePath)) {
 		throw new ExpectedError(stripIndent`
 			Error: the specified Dockerfile cannot be an absolute path. The path must be
 			relative to, and not a parent folder of, the project's source folder.
@@ -355,7 +348,7 @@ async function validateSpecifiedDockerfile(
 	}
 
 	console.error(`join(${nativeProjectPath}, ${nativeDockerfilePath})`);
-	const fullDockerfilePath = join(nativeProjectPath, nativeDockerfilePath);
+	const fullDockerfilePath = path.join(nativeProjectPath, nativeDockerfilePath);
 
 	if (!(await fs.exists(fullDockerfilePath))) {
 		throw new ExpectedError(stripIndent`
@@ -371,9 +364,9 @@ async function validateSpecifiedDockerfile(
 		`);
 	}
 
-	const { dir, ext, name } = parse(fullDockerfilePath);
+	const { dir, ext, name } = path.parse(fullDockerfilePath);
 	if (ext) {
-		const nativePathMinusExt = join(dir, name);
+		const nativePathMinusExt = path.join(dir, name);
 		if (await fs.exists(nativePathMinusExt)) {
 			throw new ExpectedError(stripIndent`
 				Error: "${name}" exists on the same folder as "${nativeDockerfilePath}".
@@ -387,57 +380,100 @@ async function validateSpecifiedDockerfile(
 	}
 	return toPosixPath(nativeDockerfilePath);
 }
+/**
+ * Validate the compose-specific command-line options defined in compose.coffee.
+ * This function is meant to be called very early on to validate users' input,
+ * before any project loading / building / deploying.
+ */
+// export async function validateComposeOptions(
+// 	sdk: BalenaSDK,
+// 	options: { [opt: string]: any },
+// ) {
+// 	options['registry-secrets'] = await getRegistrySecrets(
+// 		sdk,
+// 		options['registry-secrets'],
+// 	);
+// }
+
+export interface ProjectValidationResult {
+	dockerfilePath: string;
+	registrySecrets: RegistrySecrets;
+}
 
 export async function validateProjectDirectory(
-	opts: import('./compose').ComposeOpts,
-): Promise<string> {
+	// opts: import('./compose').ComposeOpts,
+	sdk: BalenaSDK,
+	opts: {
+		dockerfilePath?: string;
+		noComposeCheck: boolean;
+		projectPath: string;
+		registrySecretsPath?: string;
+	},
+): Promise<ProjectValidationResult> {
 	console.error('validateProjectDirectory');
 
+	if (
+		!(await fs.exists(opts.projectPath)) ||
+		!(await fs.stat(opts.projectPath)).isDirectory()
+	) {
+		throw new ExpectedError(
+			`Could not access source directory: ${opts.projectPath}`,
+		);
+	}
+
+	const result: ProjectValidationResult = {
+		dockerfilePath: opts.dockerfilePath || '',
+		registrySecrets: {},
+	};
+
 	if (opts.dockerfilePath) {
-		const dockerfilePath = await validateSpecifiedDockerfile(
+		result.dockerfilePath = await validateSpecifiedDockerfile(
 			opts.projectPath,
 			opts.dockerfilePath,
 		);
-		console.error(`dockerfilePath: "${dockerfilePath}"`);
-		throw new ExpectedError('foo');
-		return dockerfilePath;
-	}
-
-	const { join } = await import('path');
-	const fs = (await import('mz')).fs;
-	const files = await fs.readdir(opts.projectPath);
-	console.log(`files: ${files}`);
-	const projectMatch = (file: string) =>
-		/^(Dockerfile|Dockerfile\.\S+|docker-compose.ya?ml|package.json)$/.test(
-			file,
-		);
-	if (!_.some(files, projectMatch)) {
-		throw new ExpectedError(stripIndent`
-			Error: no "Dockerfile[.*]", "docker-compose.yml" or "package.json" file
-			found in project source folder "${opts.projectPath}"
-		`);
-	}
-	if (!opts.noComposeCheck) {
-		const checkCompose = async (folder: string) => {
-			return _.some(
-				await Promise.all([
-					fs.exists(join(folder, 'docker-compose.yml')),
-					fs.exists(join(folder, 'docker-compose.yaml')),
-				]),
+		console.error(`dockerfilePath: "${result.dockerfilePath}"`);
+		// throw new ExpectedError('foo');
+		// return result;
+	} else {
+		const files = await fs.readdir(opts.projectPath);
+		console.log(`files: ${files}`);
+		const projectMatch = (file: string) =>
+			/^(Dockerfile|Dockerfile\.\S+|docker-compose.ya?ml|package.json)$/.test(
+				file,
 			);
-		};
-		const [hasCompose, hasParentCompose] = await Promise.all([
-			checkCompose(opts.projectPath),
-			checkCompose(join(opts.projectPath, '..')),
-		]);
-		if (!hasCompose && hasParentCompose) {
-			Logger.getLogger().logWarn(stripIndent`
-				"docker-compose.y[a]ml" file found in parent directory: please check that the
-				correct folder is being built / pushed. (Suppress with '--nocompose-check'.)
+		if (!_.some(files, projectMatch)) {
+			throw new ExpectedError(stripIndent`
+				Error: no "Dockerfile[.*]", "docker-compose.yml" or "package.json" file
+				found in project source folder "${opts.projectPath}"
 			`);
 		}
+		if (!opts.noComposeCheck) {
+			const checkCompose = async (folder: string) => {
+				return _.some(
+					await Promise.all(
+						compositionFileNames.map(filename =>
+							fs.exists(path.join(folder, filename)),
+						),
+					),
+				);
+			};
+			const [hasCompose, hasParentCompose] = await Promise.all([
+				checkCompose(opts.projectPath),
+				checkCompose(path.join(opts.projectPath, '..')),
+			]);
+			if (!hasCompose && hasParentCompose) {
+				Logger.getLogger().logWarn(stripIndent`
+					"docker-compose.y[a]ml" file found in parent directory: please check that the
+					correct folder is being built or pushed. (Suppress with '--nocompose-check'.)
+				`);
+			}
+		}
 	}
+	result.registrySecrets = await getRegistrySecrets(
+		sdk,
+		opts.registrySecretsPath,
+	);
 
 	throw new ExpectedError('bar');
-	return opts.dockerfilePath || '';
+	return result;
 }

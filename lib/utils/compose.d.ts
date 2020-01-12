@@ -34,6 +34,7 @@ interface Descriptor {
 
 export interface ComposeOpts {
 	dockerfilePath?: string;
+	image?: string;
 	noComposeCheck: boolean;
 	projectName: string;
 	projectPath: string;
@@ -51,8 +52,6 @@ export function createProject(
 	composeStr: string,
 	projectName: string | null = null,
 ): ComposeProject;
-
-export function resolveProject(projectRoot: string): Bluebird<string>;
 
 export function tarDirectory(
 	source: string,

@@ -261,9 +261,7 @@ export const push: CommandDefinition<
 		const remote = await import('../utils/remote-build');
 		const deviceDeploy = await import('../utils/device/deploy');
 		const { checkLoggedIn } = await import('../utils/patterns');
-		const { validateProjectDirectory, getRegistrySecrets } = await import(
-			'../utils/compose_ts'
-		);
+		const { validateProjectDirectory } = await import('../utils/compose_ts');
 		const { BuildError } = await import('../utils/device/errors');
 
 		const appOrDevice: string | null =
@@ -277,16 +275,14 @@ export const push: CommandDefinition<
 			console.error(`[debug] Using ${source} as build source`);
 		}
 
-		const dockerfilePath = await validateProjectDirectory({
-			dockerfilePath: options.dockerfile,
-			noComposeCheck: options['nocompose-check'] || false,
-			projectName: 'local',
-			projectPath: source,
-		});
-
-		const registrySecrets = await getRegistrySecrets(
+		const { dockerfilePath, registrySecrets } = await validateProjectDirectory(
 			sdk,
-			options['registry-secrets'],
+			{
+				dockerfilePath: options.dockerfile,
+				noComposeCheck: options['nocompose-check'] || false,
+				projectPath: source,
+				registrySecretsPath: options['registry-secrets'],
+			},
 		);
 
 		const buildTarget = getBuildTarget(appOrDevice);

@@ -68,18 +68,6 @@ exports.generateOpts = (options) ->
 		dockerfilePath: options.dockerfile
 		noComposeCheck: options['nocompose-check']
 
-compositionFileNames = [
-	'docker-compose.yml'
-	'docker-compose.yaml'
-]
-
-# look into the given directory for valid compose files and return
-# the contents of the first one found.
-exports.resolveProject = (rootDir) ->
-	fs = require('mz/fs')
-	Promise.any compositionFileNames.map (filename) ->
-		fs.readFile(path.join(rootDir, filename), 'utf-8')
-
 # Parse the given composition and return a structure with info. Input is:
 #  - composePath: the *absolute* path to the directory containing the compose file
 #  - composeStr: the contents of the compose file, as a string

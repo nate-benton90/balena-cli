@@ -99,8 +99,8 @@ module.exports =
 		require('events').defaultMaxListeners = 1000
 
 		sdk = (require('balena-sdk')).fromSharedOptions()
-		{ validateComposeOptions } = require('../utils/compose_ts')
-		{ exitWithExpectedError } = require('../utils/patterns')
+		{ ExpectedError } = require('../errors')
+		{ validateProjectDirectory } = require('../utils/compose_ts')
 		helpers = require('../utils/helpers')
 		Logger = require('../utils/logger')
 
@@ -112,12 +112,21 @@ module.exports =
 		options.source ?= params.source
 		delete params.source
 
-		Promise.resolve(validateComposeOptions(sdk, options))
-		.then ->
-			{ application, arch, deviceType } = options
+		{ application, arch, deviceType } = options
 
+		Promise.try ->
 			if (not (arch? and deviceType?) and not application?) or (application? and (arch? or deviceType?))
-				exitWithExpectedError('You must specify either an application or an arch/deviceType pair to build for')
+				throw new ExpectedError('You must specify either an application or an arch/deviceType pair to build for')
+		.then ->
+			validateProjectDirectory(sdk, {
+				dockerfilePath: options.dockerfile,
+				noComposeCheck: options['nocompose-check'] || false,
+				projectPath: options.source,
+				registrySecretsPath: options['registry-secrets'],
+			})
+		.then ({ dockerfilePath, registrySecrets }) ->
+			options.dockerfile = dockerfilePath
+			options['registry-secrets'] = registrySecrets
 
 			if arch? and deviceType?
 				[ undefined, arch, deviceType ]

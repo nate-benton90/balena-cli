@@ -176,7 +176,8 @@ module.exports =
 		# compositions with many services trigger misleading warnings
 		require('events').defaultMaxListeners = 1000
 		sdk = (require('balena-sdk')).fromSharedOptions()
-		{ validateComposeOptions } = require('../utils/compose_ts')
+		{ ExpectedError } = require('../errors')
+		{ validateProjectDirectory } = require('../utils/compose_ts')
 		helpers = require('../utils/helpers')
 		Logger = require('../utils/logger')
 
@@ -191,13 +192,22 @@ module.exports =
 		appName = appName_raw || appName || options.application
 		delete options.application
 
-		Promise.resolve(validateComposeOptions(sdk, options))
-		.then ->
+		Promise.try ->
 			if not appName?
-				throw new Error('Please specify the name of the application to deploy')
+				throw new ExpectedError('Please specify the name of the application to deploy')
 
 			if image? and options.build
-				throw new Error('Build option is not applicable when specifying an image')
+				throw new ExpectedError('Build option is not applicable when specifying an image')
+		.then ->
+			validateProjectDirectory(sdk, {
+				dockerfilePath: options.dockerfile,
+				noComposeCheck: options['nocompose-check'] || false,
+				projectPath: options.source,
+				registrySecretsPath: options['registry-secrets'],
+			})
+		.then ({ dockerfilePath, registrySecrets }) ->
+			options.dockerfile = dockerfilePath
+			options['registry-secrets'] = registrySecrets
 
 			Promise.join(
 				helpers.getApplication(appName)
