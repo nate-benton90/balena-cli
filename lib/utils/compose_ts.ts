@@ -29,7 +29,6 @@ import * as tar from 'tar-stream';
 import { ExpectedError } from '../errors';
 import { DeviceInfo } from './device/api';
 import Logger = require('./logger');
-import { exitWithExpectedError } from './patterns';
 
 export interface RegistrySecrets {
 	[registryAddress: string]: {
@@ -102,7 +101,7 @@ async function resolveProject(projectRoot: string): Promise<string> {
  * "build variables".
  * @returns Pair of metadata object and metadata file path
  */
-export async function loadBuildMetatada(
+async function loadBuildMetatada(
 	sourceDir: string,
 ): Promise<[MultiBuild.ParsedBalenaYml, string]> {
 	let metadataPath = '';
@@ -135,7 +134,7 @@ export async function loadBuildMetatada(
 			buildMetadata = require('js-yaml').safeLoad(rawString);
 		}
 	} catch (err) {
-		return exitWithExpectedError(
+		throw new ExpectedError(
 			`Error parsing file "${metadataPath}":\n ${err.message}`,
 		);
 	}
@@ -145,7 +144,7 @@ export async function loadBuildMetatada(
 /**
  * Check whether the "build secrets" feature is being used and, if so,
  * verify that the target docker daemon is balenaEngine. If the
- * requirement is not satisfied, call exitWithExpectedError().
+ * requirement is not satisfied, reject with an ExpectedError.
  * @param docker Dockerode instance
  * @param sourceDir Project directory where to find .balena/balena.yml
  */
@@ -158,7 +157,7 @@ export async function checkBuildSecretsRequirements(
 		const dockerUtils = await import('./docker');
 		const isBalenaEngine = await dockerUtils.isBalenaEngine(docker);
 		if (!isBalenaEngine) {
-			exitWithExpectedError(stripIndent`
+			throw new ExpectedError(stripIndent`
 				The "build secrets" feature currently requires balenaEngine, but a standard Docker
 				daemon was detected. Please use command-line options to specify the hostname and
 				port number (or socket path) of a balenaEngine daemon, running on a balena device
@@ -211,7 +210,7 @@ async function parseRegistrySecrets(
 		MultiBuild.addCanonicalDockerHubEntry(registrySecrets);
 		return registrySecrets;
 	} catch (error) {
-		return exitWithExpectedError(
+		throw new ExpectedError(
 			`Error validating registry secrets file "${secretsFilename}":\n${
 				error.message
 			}`,
